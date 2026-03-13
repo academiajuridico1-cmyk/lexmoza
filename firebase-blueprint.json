@@ -1,0 +1,73 @@
+{
+  "entities": {
+    "laws": {
+      "title": "Law",
+      "description": "A legal document or law entry",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the law" },
+        "category": { "type": "string", "description": "Category ID" },
+        "content": { "type": "string", "description": "Markdown content or summary" },
+        "pdfUrl": { "type": "string", "description": "URL to the PDF file" },
+        "articleCount": { "type": "number", "description": "Number of articles" },
+        "year": { "type": "number", "description": "Year of publication" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "viewCount": { "type": "number", "description": "Number of views" },
+        "downloadCount": { "type": "number", "description": "Number of downloads" }
+      },
+      "required": ["title", "category", "content"]
+    },
+    "categories": {
+      "title": "Category",
+      "description": "Legal categories (e.g., Civil, Penal, Labor)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "icon": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "favorites": {
+      "title": "Favorite",
+      "description": "User's favorited laws",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "lawId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "lawId"]
+    },
+    "users": {
+      "title": "User",
+      "description": "User profile and roles",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "displayName": { "type": "string" }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "categories": {
+      "schema": "categories",
+      "description": "Collection of legal categories"
+    },
+    "laws": {
+      "schema": "laws",
+      "description": "Collection of laws and regulations"
+    },
+    "favorites": {
+      "schema": "favorites",
+      "description": "User favorites"
+    },
+    "users": {
+      "schema": "users",
+      "description": "User profiles"
+    }
+  }
+}

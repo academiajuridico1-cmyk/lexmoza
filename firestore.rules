@@ -1,0 +1,139 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: categories
+    // Fields:
+    //   - name: string (required)
+    //   - icon: string (optional)
+    //   - description: string (optional)
+    //
+    // Collection: laws
+    // Fields:
+    //   - title: string (required)
+    //   - category: string (required)
+    //   - content: string (required)
+    //   - pdfUrl: string (optional)
+    //   - articleCount: number (optional)
+    //   - year: number (optional)
+    //   - createdAt: timestamp (required)
+    //   - updatedAt: timestamp (required)
+    //   - viewCount: number (optional)
+    //   - downloadCount: number (optional)
+    //
+    // Collection: favorites
+    // Fields:
+    //   - userId: string (required)
+    //   - lawId: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: users
+    // Fields:
+    //   - email: string (required)
+    //   - role: string (required, enum: ['admin', 'user'])
+    //   - displayName: string (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin') ||
+          (request.auth.token.email == "moianeaabel@gmail.com" && request.auth.token.email_verified == true)
+        );
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.email is string && isValidEmail(data.email) &&
+               data.role in ['admin', 'user'] &&
+               (!('displayName' in data) || data.displayName is string) &&
+               (!('photoURL' in data) || data.photoURL is string) &&
+               (!('uid' in data) || data.uid == userId);
+      }
+
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /categories/{categoryId} {
+      function isValidCategory(data) {
+        return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+               (!('icon' in data) || data.icon is string) &&
+               (!('description' in data) || data.description is string);
+      }
+
+      allow read: if true;
+      allow write: if isAdmin() && isValidCategory(request.resource.data);
+    }
+
+    match /laws/{lawId} {
+      function isValidLaw(data) {
+        return data.title is string && data.title.size() > 0 && data.title.size() < 500 &&
+               data.category is string &&
+               data.content is string &&
+               (!('pdfUrl' in data) || data.pdfUrl is string) &&
+               (!('year' in data) || data.year is number) &&
+               data.createdAt is timestamp &&
+               data.updatedAt is timestamp;
+      }
+
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidLaw(request.resource.data);
+      allow delete: if isAdmin();
+      
+      // Allow users to increment viewCount (even guests) and downloadCount (authenticated)
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewCount', 'downloadCount']) &&
+                    (
+                      (request.resource.data.get('viewCount', 0) == resource.data.get('viewCount', 0) + 1) ||
+                      (isAuthenticated() && request.resource.data.get('downloadCount', 0) == resource.data.get('downloadCount', 0) + 1)
+                    );
+    }
+
+    match /favorites/{favoriteId} {
+      function isValidFavorite(data) {
+        return data.userId == request.auth.uid &&
+               data.lawId is string &&
+               data.createdAt is timestamp;
+      }
+
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidFavorite(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}
